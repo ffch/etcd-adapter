@@ -29,6 +29,7 @@ import (
 
 	"github.com/api7/etcd-adapter/internal/adapter"
 	"github.com/api7/etcd-adapter/internal/backends/btree"
+	"github.com/api7/etcd-adapter/internal/backends/etcd"
 	"github.com/api7/etcd-adapter/internal/backends/mysql"
 	"github.com/api7/etcd-adapter/internal/config"
 )
@@ -59,6 +60,24 @@ var rootCmd = &cobra.Command{
 
 			if err != nil {
 				logger.Panic("failed to create mysql backend: ", err)
+				return
+			}
+		case "etcd":
+			etcdConfig := config.Config.DataSource.Etcd
+			backend, err = etcd.NewEtcdCache(context.TODO(), &etcd.Options{
+				Host:     etcdConfig.Host,
+				Prefix:   etcdConfig.Prefix,
+				Timeout:  etcdConfig.Timeout,
+				User:     etcdConfig.User,
+				Password: etcdConfig.Password,
+				Tls: etcd.TlsConfig{
+					CertFile: etcdConfig.Tls.CertFile,
+					KeyFile:  etcdConfig.Tls.KeyFile,
+					CaFile:   etcdConfig.Tls.CaFile,
+					Verify:   etcdConfig.Tls.Verify},
+			})
+			if err != nil {
+				logger.Panic("failed to create etcd backend: ", err)
 				return
 			}
 		default:

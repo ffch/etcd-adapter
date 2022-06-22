@@ -1,5 +1,5 @@
 server:
-  host: 127.0.0.1
+  host: 10.224.199.88
   port: 12379
 # tls:
 #   cert: /path/to/file.pem
@@ -9,10 +9,14 @@ log:
   level: warn
 
 datasource:
-  type: mysql
-  mysql:
-    host: 127.0.0.1
-    port: 3306
-    username: root
-    password:
-    database: apisix
+  type: etcd
+  etcd:
+    host:
+      - "st.miotetcd.io.mi.srv:4001"
+    prefix: /SERVICES/apisix
+    timeout: 30                     # 30 seconds
+    tls:
+      cert: config/miot-etcd_client.pem          # path of certificate used by the etcd client
+      key: config/miot-etcd_client_key.pem            # path of key used by the etcd client
+      ca_file: config/miot-etcd_ca.pem
+      verify: true

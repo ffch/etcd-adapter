@@ -23,9 +23,26 @@ type mysqlConfig struct {
 	Database string `mapstructure:"database"`
 }
 
+type etcdConfig struct {
+	Host     []string      `mapstructure:"host"`
+	Prefix   string        `mapstructure:"prefix"`
+	Timeout  int           `mapstructure:"timeout"`
+	User     string        `mapstructure:"user"`
+	Password string        `mapstructure:"password"`
+	Tls      etcdTlsConfig `mapstructure:"tls"`
+}
+
+type etcdTlsConfig struct {
+	CertFile string `mapstructure:"cert"`
+	KeyFile  string `mapstructure:"key"`
+	CaFile   string `mapstructure:"ca_file"`
+	Verify   bool   `mapstructure:"verify"`
+}
+
 type datasource struct {
 	Type  string      `mapstructure:"type"`
 	MySQL mysqlConfig `mapstructure:"mysql"`
+	Etcd  etcdConfig  `mapstructure:"etcd"`
 }
 
 type config struct {
