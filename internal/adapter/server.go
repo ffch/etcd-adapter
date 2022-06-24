@@ -74,6 +74,7 @@ func (a *adapter) Serve(ctx context.Context, l net.Listener) error {
 			),
 		)
 		mux.HandleFunc("/version", a.showVersion)
+		mux.HandleFunc("/v3/lease/grant", a.leaseGrant)
 		a.httpSrv = &http.Server{
 			Handler: mux,
 		}

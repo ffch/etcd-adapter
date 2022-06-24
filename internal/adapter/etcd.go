@@ -2,7 +2,9 @@ package adapter
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"github.com/api7/etcd-adapter/internal/extend"
 	"net"
 	"net/http"
 
@@ -64,16 +66,18 @@ type adapter struct {
 
 	eventsCh chan []*Event
 	backend  server.Backend
+	ext      extend.Extend
 	bridge   *server.KVServerBridge
 }
 
 // NewEtcdAdapter new an etcd adapter instance.
-func NewEtcdAdapter(backend server.Backend, logger *log.Logger) Adapter {
+func NewEtcdAdapter(backend server.Backend, ext extend.Extend, logger *log.Logger) Adapter {
 	bridge := server.New(backend, "")
 	a := &adapter{
 		logger:   logger,
 		eventsCh: make(chan []*Event),
 		backend:  backend,
+		ext:      ext,
 		bridge:   bridge,
 	}
 	return a
@@ -219,10 +223,32 @@ func (a *adapter) handleDeleteEvent(ctx context.Context, ev *Event) {
 func (a *adapter) showVersion(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, err := w.Write([]byte(`{"etcdserver":"3.5.0","etcdcluster":"3.5.0"}`))
+	_, err := w.Write([]byte(`{"etcdserver":"3.4.18","etcdcluster":"3.4.0"}`))
 	if err != nil {
 		a.logger.Warn("failed to send version info",
 			zap.Error(err),
 		)
 	}
+}
+
+func (a *adapter) leaseGrant(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	var grantData struct {
+		ID  string
+		TTL int64
+	}
+	json.NewDecoder(req.Body).Decode(&grantData)
+	res, err1 := a.ext.LeaseGrant(a.ctx, grantData.ID, grantData.TTL)
+	if err1 != nil {
+		_, err := w.Write([]byte(`{"msg":"LeaseGrant failed"}`))
+		if err != nil {
+			a.logger.Warn("failed to send version info",
+				zap.Error(err),
+			)
+		}
+		return
+	}
+	jo, _ := json.Marshal(res)
+	w.Write(jo)
 }

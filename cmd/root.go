@@ -18,6 +18,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/api7/etcd-adapter/internal/extend"
 	"net"
 	"os"
 	"os/signal"
@@ -51,10 +52,11 @@ var rootCmd = &cobra.Command{
 
 		// initialize backend
 		var backend server.Backend
+		var ext extend.Extend
 		switch config.Config.DataSource.Type {
 		case "mysql":
 			mysqlConfig := config.Config.DataSource.MySQL
-			backend, err = mysql.NewMySQLCache(context.TODO(), &mysql.Options{
+			backend, ext, err = mysql.NewMySQLCache(context.TODO(), &mysql.Options{
 				DSN: fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", mysqlConfig.Username, mysqlConfig.Password, mysqlConfig.Host, mysqlConfig.Port, mysqlConfig.Database),
 			})
 
@@ -64,7 +66,7 @@ var rootCmd = &cobra.Command{
 			}
 		case "etcd":
 			etcdConfig := config.Config.DataSource.Etcd
-			backend, err = etcd.NewEtcdCache(context.TODO(), &etcd.Options{
+			backend, ext, err = etcd.NewEtcdCache(context.TODO(), &etcd.Options{
 				Host:     etcdConfig.Host,
 				Prefix:   etcdConfig.Prefix,
 				Timeout:  etcdConfig.Timeout,
@@ -85,7 +87,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		// bootstrap etcd adapter
-		adapter := adapter.NewEtcdAdapter(backend, logger)
+		adapter := adapter.NewEtcdAdapter(backend, ext, logger)
 
 		ln, err := net.Listen("tcp", net.JoinHostPort(config.Config.Server.Host, config.Config.Server.Port))
 		if err != nil {

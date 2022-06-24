@@ -17,7 +17,7 @@ package mysql
 
 import (
 	"context"
-
+	"github.com/api7/etcd-adapter/internal/extend"
 	"github.com/k3s-io/kine/pkg/drivers/generic"
 	mysqldriver "github.com/k3s-io/kine/pkg/drivers/mysql"
 	"github.com/k3s-io/kine/pkg/server"
@@ -37,16 +37,16 @@ type mysqlCache struct {
 // NewMySQLCache returns a server.Backend interface which was implemented with
 // the MySQL backend. The first argument `ctx` is used to control the lifecycle of
 // mysql connection pool.
-func NewMySQLCache(ctx context.Context, options *Options) (server.Backend, error) {
+func NewMySQLCache(ctx context.Context, options *Options) (server.Backend, extend.Extend, error) {
 	dsn := options.DSN
 	backend, err := mysqldriver.New(ctx, dsn, tls.Config{}, options.ConnPool, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	mc := &mysqlCache{
 		Backend: backend,
 	}
-	return mc, nil
+	return mc, nil, nil
 }
 
 func (m *mysqlCache) Start(ctx context.Context) error {

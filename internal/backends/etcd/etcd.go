@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/api7/etcd-adapter/internal/extend"
 	"github.com/api7/gopkg/pkg/log"
 	"github.com/k3s-io/kine/pkg/server"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"strconv"
 	"time"
 )
 
@@ -38,6 +40,25 @@ type EtcdV3 struct {
 	currentRevision int64
 }
 
+func (s *EtcdV3) LeaseGrant(ctx context.Context, id string, ttl int64) (*extend.GrantRes, error) {
+	resp, err := s.client.Lease.Grant(ctx, ttl)
+	if err != nil {
+		return nil, err
+	}
+	res := &extend.GrantRes{
+		ID:    strconv.FormatInt(int64(resp.ID), 10),
+		TTL:   resp.TTL,
+		Error: resp.Error,
+		GrantHeaderRes: extend.GrantHeaderRes{
+			ClusterId: resp.ResponseHeader.ClusterId,
+			MemberId:  resp.ResponseHeader.MemberId,
+			Revision:  resp.ResponseHeader.Revision,
+			RaftTerm:  resp.ResponseHeader.RaftTerm,
+		},
+	}
+	return res, nil
+}
+
 func (s *EtcdV3) Count(ctx context.Context, prefix string) (int64, int64, error) {
 	resp, err := s.client.Get(ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
@@ -51,8 +72,8 @@ func (s *EtcdV3) Watch(ctx context.Context, key string, revision int64) <-chan [
 	ch := make(chan []*server.Event, 1)
 	go func() {
 		defer close(ch)
-		var events []*server.Event
 		for event := range eventChan {
+			var events []*server.Event
 			for _, ev := range event.Events {
 				// We use a placeholder to mark a key to be a directory. So we need to skip the hack here.
 				if bytes.Equal(ev.Kv.Value, DirPlaceholder) {
@@ -80,8 +101,9 @@ func (s *EtcdV3) Watch(ctx context.Context, key string, revision int64) <-chan [
 				}
 				events = append(events, typ)
 			}
-
-			ch <- events
+			if len(events) > 0 {
+				ch <- events
+			}
 		}
 	}()
 
@@ -92,7 +114,7 @@ func (s *EtcdV3) DbSize(ctx context.Context) (int64, error) {
 	return 0, nil
 }
 
-func NewEtcdCache(ctx context.Context, options *Options) (server.Backend, error) {
+func NewEtcdCache(ctx context.Context, options *Options) (server.Backend, extend.Extend, error) {
 	timeout := time.Duration(options.Timeout)
 	s := &EtcdV3{timeout: timeout, currentRevision: 0}
 
@@ -115,7 +137,7 @@ func NewEtcdCache(ctx context.Context, options *Options) (server.Backend, error)
 		}
 		tlsConf, err := tlsInfo.ClientConfig()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		config.TLS = tlsConf
 	}
@@ -124,11 +146,11 @@ func NewEtcdCache(ctx context.Context, options *Options) (server.Backend, error)
 	cli, err := clientv3.New(s.conf)
 	if err != nil {
 		log.Errorf("etcd init failed: %s", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	s.client = cli
-	return s, nil
+	return s, s, nil
 }
 
 func (s *EtcdV3) Start(ctx context.Context) error {
@@ -137,20 +159,17 @@ func (s *EtcdV3) Start(ctx context.Context) error {
 
 // Get a value given its key
 func (s *EtcdV3) Get(ctx context.Context, key string, revision int64) (int64, *server.KeyValue, error) {
-	if revision <= 0 {
+	if revision < 0 {
 		revision = s.currentRevision
 	}
-	ctx, cancel := context.WithTimeout(ctx, s.timeout)
-	defer cancel()
-
-	resp, err := s.client.Get(ctx, key)
+	resp, err := s.client.Get(ctx, key, clientv3.WithPrefix(), clientv3.WithRev(revision))
 	if err != nil {
 		log.Errorf("etcd get key[%s] failed: %s", key, err)
 		return revision, nil, fmt.Errorf("etcd get key[%s] failed: %s", key, err)
 	}
 	if resp.Count == 0 {
 		log.Warnf("etcd get key[%s] is not found", key)
-		return revision, nil, fmt.Errorf("etcd get key[%s] is not found", key)
+		return revision, nil, nil
 	}
 	kv := &server.KeyValue{
 		Key:            key,
@@ -183,7 +202,6 @@ func (s *EtcdV3) List(ctx context.Context, prefix, startKey string, limit, revis
 
 func (s *EtcdV3) Create(ctx context.Context, key string, value []byte, lease int64) (int64, error) {
 	resp, err := s.client.Txn(ctx).
-		If(clientv3.Compare(clientv3.ModRevision(key), "=", 0)).
 		Then(clientv3.OpPut(key, string(value))).
 		Commit()
 	if err != nil {
@@ -192,14 +210,12 @@ func (s *EtcdV3) Create(ctx context.Context, key string, value []byte, lease int
 	if !resp.Succeeded {
 		return s.currentRevision, fmt.Errorf("key exists")
 	}
-	return s.currentRevision, nil
+	return resp.Header.Revision, nil
 }
 
 func (s *EtcdV3) Update(ctx context.Context, key string, value []byte, revision, lease int64) (int64, *server.KeyValue, bool, error) {
 	resp, err := s.client.Txn(ctx).
-		If(clientv3.Compare(clientv3.ModRevision(key), "=", revision)).
 		Then(clientv3.OpPut(key, string(value))).
-		Else(clientv3.OpGet(key)).
 		Commit()
 	if err != nil {
 		return revision, nil, false, err
@@ -212,7 +228,7 @@ func (s *EtcdV3) Update(ctx context.Context, key string, value []byte, revision,
 		CreateRevision: revision,
 		ModRevision:    revision,
 	}
-	return revision, kv, true, nil
+	return resp.Header.Revision, kv, true, nil
 }
 
 func (s *EtcdV3) Delete(ctx context.Context, key string, revision int64) (int64, *server.KeyValue, bool, error) {
@@ -232,7 +248,7 @@ func (s *EtcdV3) Delete(ctx context.Context, key string, revision int64) (int64,
 		CreateRevision: revision,
 		ModRevision:    revision,
 	}
-	return revision, kv, true, nil
+	return resp.Header.Revision, kv, true, nil
 }
 
 func (s *EtcdV3) Close() error {
