@@ -18,10 +18,10 @@ package mysql
 import (
 	"context"
 	"github.com/api7/etcd-adapter/internal/extend"
-	"github.com/k3s-io/kine/pkg/drivers/generic"
-	mysqldriver "github.com/k3s-io/kine/pkg/drivers/mysql"
-	"github.com/k3s-io/kine/pkg/server"
-	"github.com/k3s-io/kine/pkg/tls"
+	"github.com/api7/etcd-adapter/kine/drivers/generic"
+	mysqldriver "github.com/api7/etcd-adapter/kine/drivers/mysql"
+	"github.com/api7/etcd-adapter/kine/server"
+	"github.com/api7/etcd-adapter/kine/tls"
 )
 
 // Options contains settings for controlling the connection to MySQL.

@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k3s-io/kine/pkg/server"
+	"github.com/api7/etcd-adapter/kine/server"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )

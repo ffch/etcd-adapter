@@ -8,8 +8,8 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/api7/etcd-adapter/kine/server"
 	"github.com/api7/gopkg/pkg/log"
-	"github.com/k3s-io/kine/pkg/server"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )

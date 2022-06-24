@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/api7/etcd-adapter/kine/server"
 	"github.com/api7/gopkg/pkg/log"
 	"github.com/google/btree"
-	"github.com/k3s-io/kine/pkg/server"
 	"go.uber.org/zap"
 )
 

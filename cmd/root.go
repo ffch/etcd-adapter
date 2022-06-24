@@ -24,8 +24,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/api7/etcd-adapter/kine/server"
 	"github.com/api7/gopkg/pkg/log"
-	"github.com/k3s-io/kine/pkg/server"
 	"github.com/spf13/cobra"
 
 	"github.com/api7/etcd-adapter/internal/adapter"
