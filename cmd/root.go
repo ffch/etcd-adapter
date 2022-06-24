@@ -41,14 +41,13 @@ var rootCmd = &cobra.Command{
 	Use:   "etcd-adapter",
 	Short: "The bridge between etcd protocol and other storage backends.",
 	Run: func(cmd *cobra.Command, args []string) {
-		// initialize logger
-		logger, err := log.NewLogger()
-
 		// initialize configuration
-		err = config.Init(configFile, logger)
+		err := config.Init(configFile)
 		if err != nil {
 			return
 		}
+		// initialize logger
+		logger, err := log.NewLogger(log.WithLogLevel(config.Config.Log.Level))
 
 		// initialize backend
 		var backend server.Backend
@@ -77,7 +76,7 @@ var rootCmd = &cobra.Command{
 					KeyFile:  etcdConfig.Tls.KeyFile,
 					CaFile:   etcdConfig.Tls.CaFile,
 					Verify:   etcdConfig.Tls.Verify},
-			})
+			}, logger)
 			if err != nil {
 				logger.Panic("failed to create etcd backend: ", err)
 				return
@@ -93,6 +92,7 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			panic(err)
 		}
+		logger.Info("etcd adapter started at ", config.Config.Server.Port)
 		go func() {
 			if err := adapter.Serve(context.Background(), ln); err != nil {
 				logger.Panic(err)

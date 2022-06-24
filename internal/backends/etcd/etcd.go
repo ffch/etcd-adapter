@@ -38,6 +38,7 @@ type EtcdV3 struct {
 	conf            clientv3.Config
 	timeout         time.Duration
 	currentRevision int64
+	logger          *log.Logger
 }
 
 func (s *EtcdV3) LeaseGrant(ctx context.Context, id string, ttl int64) (*extend.GrantRes, error) {
@@ -45,6 +46,7 @@ func (s *EtcdV3) LeaseGrant(ctx context.Context, id string, ttl int64) (*extend.
 	if err != nil {
 		return nil, err
 	}
+	s.logger.Info("etcd LeaseGrant, id:", id)
 	res := &extend.GrantRes{
 		ID:    strconv.FormatInt(int64(resp.ID), 10),
 		TTL:   resp.TTL,
@@ -114,9 +116,9 @@ func (s *EtcdV3) DbSize(ctx context.Context) (int64, error) {
 	return 0, nil
 }
 
-func NewEtcdCache(ctx context.Context, options *Options) (server.Backend, extend.Extend, error) {
+func NewEtcdCache(ctx context.Context, options *Options, logger *log.Logger) (server.Backend, extend.Extend, error) {
 	timeout := time.Duration(options.Timeout)
-	s := &EtcdV3{timeout: timeout, currentRevision: 0}
+	s := &EtcdV3{timeout: timeout, currentRevision: 0, logger: logger}
 
 	if s.timeout == 0 {
 		s.timeout = 10 * time.Second
@@ -145,7 +147,7 @@ func NewEtcdCache(ctx context.Context, options *Options) (server.Backend, extend
 	s.conf = config
 	cli, err := clientv3.New(s.conf)
 	if err != nil {
-		log.Errorf("etcd init failed: %s", err)
+		s.logger.Errorf("etcd init failed: %s", err)
 		return nil, nil, err
 	}
 
@@ -164,11 +166,11 @@ func (s *EtcdV3) Get(ctx context.Context, key string, revision int64) (int64, *s
 	}
 	resp, err := s.client.Get(ctx, key, clientv3.WithPrefix(), clientv3.WithRev(revision))
 	if err != nil {
-		log.Errorf("etcd get key[%s] failed: %s", key, err)
+		s.logger.Errorf("etcd get key[%s] failed: %s", key, err)
 		return revision, nil, fmt.Errorf("etcd get key[%s] failed: %s", key, err)
 	}
 	if resp.Count == 0 {
-		log.Warnf("etcd get key[%s] is not found", key)
+		s.logger.Info("etcd get key[%s] is not found", key)
 		return revision, nil, nil
 	}
 	kv := &server.KeyValue{
