@@ -1,17 +1,5 @@
-# Copyright api7.ai
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+ENV_INSTALL            ?= install
+ENV_INST_PREFIX        ?= /usr/local
 
 test:
 	@go test ./...
@@ -21,6 +9,22 @@ bench:
 
 gofmt:
 	@find . -name "*.go" | xargs gofmt -w
+
+.PHONY: build
+build:
+	go build
+
+### install:		Install apisix-seed
+.PHONY: install
+install:
+	$(ENV_INSTALL) -d $(ENV_INST_PREFIX)/apisix-etcd
+	$(ENV_INSTALL) -d $(ENV_INST_PREFIX)/apisix-etcd/log
+	$(ENV_INSTALL) -d $(ENV_INST_PREFIX)/apisix-etcd/config
+	$(ENV_INSTALL) etcd-adapter $(ENV_INST_PREFIX)/apisix-etcd/
+	$(ENV_INSTALL) config/config.yaml $(ENV_INST_PREFIX)/apisix-etcd/config/
+	$(ENV_INSTALL) config/miot-etcd_client.pem $(ENV_INST_PREFIX)/apisix-etcd/config/
+	$(ENV_INSTALL) config/miot-etcd_client_key.pem $(ENV_INST_PREFIX)/apisix-etcd/config/
+	$(ENV_INSTALL) config/miot-etcd_ca.pem $(ENV_INST_PREFIX)/apisix-etcd/config/
 
 lint:
 	@golangci-lint run
